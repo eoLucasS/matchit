@@ -31,7 +31,6 @@ export default function Onboarding() {
   const [interests, setInterests] = useState<string[]>([]);
   const [radius, setRadius] = useState(10);
   const [conditions, setConditions] = useState<string[]>(['semi']);
-  const [consent, setConsent] = useState(true);
 
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
@@ -42,7 +41,7 @@ export default function Onboarding() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.replace('/auth'); return; }
 
-      // Carrega prefs existentes (para editar)
+      // Carrega prefs existentes (para edição também)
       const { data } = await supabase
         .from('profiles')
         .select('interests, preferred_conditions, radius_km')
@@ -55,8 +54,8 @@ export default function Onboarding() {
         setRadius(data.radius_km ?? 10);
       }
 
-      // Localização garantida: GPS → IP → fallback SP (sempre retorna algo)
-      const g = await getGeoApprox();
+      // Localização garantida (GPS → IP → fallback SP) + jitter
+      const g = await getGeoApprox(); // sempre retorna algo
       const j = jitterLatLng(g!.lat, g!.lng);
       setLat(j.lat);
       setLng(j.lng);
@@ -68,6 +67,10 @@ export default function Onboarding() {
 
   async function save() {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.replace('/auth'); return; }
+
+      // 1) Tenta salvar via RPC (inclui location no Postgres)
       const { error } = await supabase.rpc('set_profile_onboarding', {
         p_interests: interests,
         p_conditions: conditions,
@@ -75,7 +78,20 @@ export default function Onboarding() {
         p_lat: lat,
         p_lng: lng,
       });
-      if (error) throw error;
+
+      // 2) Cinturão e suspensório: se o RPC falhar por qualquer motivo, salva o básico sem location
+      if (error) {
+        await supabase
+          .from('profiles')
+          .update({
+            interests,
+            preferred_conditions: conditions,
+            radius_km: radius,
+            onboarded: true,
+          })
+          .eq('user_id', user.id);
+      }
+
       toast.success('Preferências salvas!');
       router.push('/profile');
     } catch (e: any) {
@@ -105,8 +121,12 @@ export default function Onboarding() {
             </div>
 
             <div className="mb-6">
-              <h1 className="text-2xl sm:text-3xl font-semibold">{editMode ? 'Ajuste suas preferências' : 'Personalize seu feed'}</h1>
-              <p className="text-sm text-[#9CA3AF]">{editMode ? 'Atualize seus filtros para melhorar as recomendações.' : 'Conte o que você busca e até onde pode ir.'}</p>
+              <h1 className="text-2xl sm:text-3xl font-semibold">
+                {editMode ? 'Ajuste suas preferências' : 'Personalize seu feed'}
+              </h1>
+              <p className="text-sm text-[#9CA3AF]">
+                {editMode ? 'Atualize seus filtros para melhorar as recomendações.' : 'Conte o que você busca e até onde pode ir.'}
+              </p>
             </div>
 
             {step === 1 && (
@@ -140,7 +160,14 @@ export default function Onboarding() {
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
                 <div className="text-sm font-medium">Distância máxima (km)</div>
                 <div>
-                  <input type="range" min={1} max={50} value={radius} onChange={(e) => setRadius(parseInt(e.target.value))} className="w-full accent-[#2563EB]" />
+                  <input
+                    type="range"
+                    min={1}
+                    max={50}
+                    value={radius}
+                    onChange={(e) => setRadius(parseInt(e.target.value))}
+                    className="w-full accent-[#2563EB]"
+                  />
                   <div className="text-xs text-[#9CA3AF] mt-1">{radius} km</div>
                 </div>
 
@@ -201,7 +228,9 @@ export default function Onboarding() {
             <div className="relative h-full p-10 flex flex-col justify-center">
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
                 <h2 className="text-3xl font-semibold">Seu feed, do seu jeito.</h2>
-                <p className="mt-3 text-[#B2B7BE] max-w-md">Defina interesses, distância e condição. Nós cuidamos do ranking para você encontrar negócios rápidos, perto de casa.</p>
+                <p className="mt-3 text-[#B2B7BE] max-w-md">
+                  Defina interesses, distância e condição. Nós cuidamos do ranking para você encontrar negócios rápidos, perto de casa.
+                </p>
               </motion.div>
             </div>
           </div>
