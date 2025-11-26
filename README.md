@@ -49,9 +49,9 @@ Criar uma plataforma intuitiva onde qualquer pessoa possa:
 
 
 ## 👥 Equipe
-- João Victor Batista Barreto – Frontend & UX  
-- Lucas Lopes da Silva – Backend & Arquitetura  
-- Nycolas Allan Gabriel Rivero Garcia – DevOps & Documentação  
+- João Victor Batista Barreto – Documentação, Apresentação, UX, Marketing
+- Lucas Lopes da Silva – BackEnd, Front-End, DataBase e Deploy  
+- Nycolas Allan Gabriel Rivero Garcia – DevOps, Documentação e Arquitetura  
 
 Disciplinas: 
 - Usabilidade, Desenvolvimento Web, Mobile e Jogos
